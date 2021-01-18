@@ -32,7 +32,6 @@ class TelloUI:
         self.stopEvent = None
 
         # Auto Route
-        self.isAutoModeRunning = False
         self.autoRoute = AutoRoute(self.tello)
         
         # control variables
@@ -145,23 +144,27 @@ class TelloUI:
         self.quit_waiting_flag = True
 
     def flyAuto(self):
-        if self.isAutoModeRunning:
-            print("\nauto mode is already running\n")
-            return
-        self.autoRoute = AutoRoute(self.tello)
-        self.autoRoute.start()
-        print("\nauto mode is activated\n")
-        self.isAutoModeRunning = True
+        if self.autoRoute.isAlive():
+            if self.autoRoute.isPaused():
+                print("\ncontinue with auto mode...\n")
+                self.autoRoute.resume()
+                print("\nauto mode resumed\n")
+            else:
+                print("\nauto mode is already running\n")
+        else:
+            self.autoRoute.start()
+            print("\nauto mode is activated\n")
 
-    def stopAuto(self):
-        if self.isAutoModeRunning:
-            print("\nstopping auto mode\n")
-            self.autoRoute.raise_interrupt()
-            self.autoRoute.join()
-            self.isAutoModeRunning = False
+    def pauseAuto(self):
+        if self.autoRoute.isPaused():
+            print("\nauto mode is already paused\n")
+        else:
+            print("\npausing auto mode...\n")
+            self.autoRoute.pause()
+            print("\nauto mode paused\n")
    
     def openCmdWindow(self):
-        self.stopAuto()
+        self.pauseAuto()
         """
         open the cmd window and initial all the button and text
         """        
