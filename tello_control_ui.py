@@ -9,6 +9,9 @@ import os
 import time
 import platform
 
+from Perimeter_Sweep import AutoRoute
+
+
 class TelloUI:
     """Wrapper class to enable the GUI."""
 
@@ -26,7 +29,11 @@ class TelloUI:
         self.outputPath = outputpath # the path that save pictures created by clicking the takeSnapshot button 
         self.frame = None  # frame read from h264decoder and used for pose recognition 
         self.thread = None # thread of the Tkinter mainloop
-        self.stopEvent = None  
+        self.stopEvent = None
+
+        # Auto Route
+        self.isAutoModeRunning = False
+        self.autoRoute = AutoRoute(self.tello)
         
         # control variables
         self.distance = 0.1  # default distance for 'move' cmd
@@ -49,9 +56,14 @@ class TelloUI:
         self.btn_pause.pack(side="bottom", fill="both",
                             expand="yes", padx=10, pady=5)
 
-        self.btn_landing = tki.Button(
-            self.root, text="Open Command Panel", relief="raised", command=self.openCmdWindow)
-        self.btn_landing.pack(side="bottom", fill="both",
+        self.btn_manual = tki.Button(
+            self.root, text="Use Manual Mode", relief="raised", command=self.openCmdWindow)
+        self.btn_manual.pack(side="bottom", fill="both",
+                              expand="yes", padx=10, pady=5)
+
+        self.btn_auto = tki.Button(
+            self.root, text="Use Auto Mode", relief="raised", command=self.flyAuto)
+        self.btn_auto.pack(side="bottom", fill="both",
                               expand="yes", padx=10, pady=5)
         
         # start a thread that constantly pools the video sensor for
@@ -130,9 +142,26 @@ class TelloUI:
         """
         set the variable as TRUE,it will stop computer waiting for response from tello  
         """       
-        self.quit_waiting_flag = True        
+        self.quit_waiting_flag = True
+
+    def flyAuto(self):
+        if self.isAutoModeRunning:
+            print("\nauto mode is already running\n")
+            return
+        self.autoRoute = AutoRoute(self.tello)
+        self.autoRoute.start()
+        print("\nauto mode is activated\n")
+        self.isAutoModeRunning = True
+
+    def stopAuto(self):
+        if self.isAutoModeRunning:
+            print("\nstopping auto mode\n")
+            self.autoRoute.raise_interrupt()
+            self.autoRoute.join()
+            self.isAutoModeRunning = False
    
     def openCmdWindow(self):
+        self.stopAuto()
         """
         open the cmd window and initial all the button and text
         """        
