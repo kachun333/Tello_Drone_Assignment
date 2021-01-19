@@ -164,7 +164,8 @@ class TelloUI:
             print("\nauto mode paused\n")
    
     def openCmdWindow(self):
-        self.pauseAuto()
+        if self.autoRoute.isAlive():
+            self.pauseAuto()
         """
         open the cmd window and initial all the button and text
         """        

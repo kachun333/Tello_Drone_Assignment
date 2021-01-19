@@ -14,10 +14,10 @@ class AutoRoute(threading.Thread):
         self.__running.set() # Set running to True
 
     def isRunning(self):
-        return self.__running
+        return self.__running.isSet()
 
     def isPaused(self):
-        return not self.__flag
+        return not self.__flag.isSet()
 
     def run(self):
         self.tello = self.tello
