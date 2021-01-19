@@ -156,9 +156,7 @@ class TelloUI:
             print("\nauto mode is activated\n")
 
     def pauseAuto(self):
-        if self.autoRoute.isPaused():
-            print("\nauto mode is already paused\n")
-        else:
+        if not self.autoRoute.isPaused():
             print("\npausing auto mode...\n")
             self.autoRoute.pause()
             print("\nauto mode paused\n")
@@ -387,6 +385,7 @@ class TelloUI:
         the quit process to continue
         """
         print("[INFO] closing...")
+        self.autoRoute.stop()
         self.stopEvent.set()
         del self.tello
         self.root.quit()
