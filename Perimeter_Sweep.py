@@ -30,10 +30,6 @@ class AutoRoute:
                 break
             self.flyingLogic()
 
-    def take_off(self):
-        self.tello.send("takeoff", 7)
-        self.counter += 1
-
     def flyingLogic(self):
         # Billy's flight path
         if self.tello.manual:
