@@ -33,8 +33,14 @@ class Tello:
         self.socket_video = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # socket for receiving video stream
         self.tello_address = (tello_ip, tello_port)
         self.local_video_port = 11111  # port for receiving video stream
-        self.last_height = 0
+
+        self.height = 0
+        self.manual = True
+        self.manual_move = []
+        self.move_back_to_perimeter_flag = False
         self.socket.bind((local_ip, local_port))
+        self.distance = 2
+        self.degree = 30
 
         # thread for receiving cmd ack
         self.receive_thread = threading.Thread(target=self._receive_thread)
@@ -55,6 +61,49 @@ class Tello:
         self.receive_video_thread.daemon = True
 
         self.receive_video_thread.start()
+        self.send("Command", 3)
+
+    # Send the preplanned route to Tello and allow for a delay in seconds
+    def send_preplanned_route(self, message, delay):
+        # Try to send the message otherwise print the exception
+        try:
+            self.socket.sendto(message.encode(), self.tello_address)
+            print("Sending message: " + message)
+        except Exception as e:
+            print("Error sending: " + str(e))
+
+        # Delay for a user-defined period of time
+        time.sleep(delay)
+
+    # Send the message to Tello and allow for a delay in seconds
+    def send(self, message, delay):
+        if message.lower() == "land":
+            self.height = 0
+        elif message.lower() == "takeoff":
+            self.height += 30
+        # Try to send the message otherwise print the exception
+        try:
+            self.socket.sendto(message.encode(), self.tello_address)
+            print("Sending message: " + message)
+        except Exception as e:
+            print("Error sending: " + str(e))
+
+        # Delay for a user-defined period of time
+        time.sleep(delay)
+
+    # Receive the message from Tello
+    def receive(self):
+        # Continuously loop and listen for incoming messages
+        while True:
+            # Try to receive the message otherwise print the exception
+            try:
+                response, ip_address = self.socket.recvfrom(128)
+                print("Received message: " + response.decode(encoding='utf-8'))
+            except Exception as e:
+                # If there's an error close the socket and break out of the loop
+                self.socket.close()
+                print("Error receiving: " + str(e))
+            break
 
     def __del__(self):
         """Closes the local socket."""
@@ -131,329 +180,255 @@ class Tello:
 
         return res_frame_list
 
-    def send_command(self, command):
-        """
-        Send a command to the Tello and wait for a response.
-
-        :param command: Command to send.
-        :return (str): Response from Tello.
-
-        """
-
-        print (">> send cmd: {}".format(command))
-        self.abort_flag = False
-        timer = threading.Timer(self.command_timeout, self.set_abort_flag)
-
-        self.socket.sendto(command.encode('utf-8'), self.tello_address)
-
-        timer.start()
-        while self.response is None:
-            if self.abort_flag is True:
-                break
-        timer.cancel()
-        
-        if self.response is None:
-            response = 'none_response'
-        else:
-            response = self.response.decode('utf-8')
-
-        self.response = None
-
-        return response
-    
-    def set_abort_flag(self):
-        """
-        Sets self.abort_flag to True.
-
-        Used by the timer in Tello.send_command() to indicate to that a response
-        
-        timeout has occurred.
-
-        """
-
-        self.abort_flag = True
-
     def takeoff(self):
-        """
-        Initiates take-off.
-
-        Returns:
-            str: Response from Tello, 'OK' or 'FALSE'.
-
-        """
-
-        return self.send_command('takeoff')
-
-    def set_speed(self, speed):
-        """
-        Sets speed.
-
-        This method expects KPH or MPH. The Tello API expects speeds from
-        1 to 100 centimeters/second.
-
-        Metric: .1 to 3.6 KPH
-        Imperial: .1 to 2.2 MPH
-
-        Args:
-            speed (int|float): Speed.
-
-        Returns:
-            str: Response from Tello, 'OK' or 'FALSE'.
-
-        """
-
-        speed = float(speed)
-
-        if self.imperial is True:
-            speed = int(round(speed * 44.704))
+        if self.height != 0:
+            print("Drone already took off!")
+        elif not self.manual:
+            print("Please activate manual mode to control the drone")
         else:
-            speed = int(round(speed * 27.7778))
-
-        return self.send_command('speed %s' % speed)
-
-    def rotate_cw(self, degrees):
-        """
-        Rotates clockwise.
-
-        Args:
-            degrees (int): Degrees to rotate, 1 to 360.
-
-        Returns:
-            str: Response from Tello, 'OK' or 'FALSE'.
-
-        """
-
-        return self.send_command('cw %s' % degrees)
-
-    def rotate_ccw(self, degrees):
-        """
-        Rotates counter-clockwise.
-
-        Args:
-            degrees (int): Degrees to rotate, 1 to 360.
-
-        Returns:
-            str: Response from Tello, 'OK' or 'FALSE'.
-
-        """
-        return self.send_command('ccw %s' % degrees)
-
-    def flip(self, direction):
-        """
-        Flips.
-
-        Args:
-            direction (str): Direction to flip, 'l', 'r', 'f', 'b'.
-
-        Returns:
-            str: Response from Tello, 'OK' or 'FALSE'.
-
-        """
-
-        return self.send_command('flip %s' % direction)
-
-    def get_response(self):
-        """
-        Returns response of tello.
-
-        Returns:
-            int: response of tello.
-
-        """
-        response = self.response
-        return response
-
-    def get_height(self):
-        """Returns height(dm) of tello.
-
-        Returns:
-            int: Height(dm) of tello.
-
-        """
-        height = self.send_command('height?')
-        height = str(height)
-        height = filter(str.isdigit, height)
-        try:
-            height = int(height)
-            self.last_height = height
-        except:
-            height = self.last_height
-            pass
-        return height
-
-    def get_battery(self):
-        """Returns percent battery life remaining.
-
-        Returns:
-            int: Percent battery life remaining.
-
-        """
-        
-        battery = self.send_command('battery?')
-
-        try:
-            battery = int(battery)
-        except:
-            pass
-
-        return battery
-
-    def get_flight_time(self):
-        """Returns the number of seconds elapsed during flight.
-
-        Returns:
-            int: Seconds elapsed during flight.
-
-        """
-
-        flight_time = self.send_command('time?')
-
-        try:
-            flight_time = int(flight_time)
-        except:
-            pass
-
-        return flight_time
-
-    def get_speed(self):
-        """Returns the current speed.
-
-        Returns:
-            int: Current speed in KPH or MPH.
-
-        """
-
-        speed = self.send_command('speed?')
-
-        try:
-            speed = float(speed)
-
-            if self.imperial is True:
-                speed = round((speed / 44.704), 1)
-            else:
-                speed = round((speed / 27.7778), 1)
-        except:
-            pass
-
-        return speed
+            self.height += 30
+            self.send('takeoff', 3)
+            if not self.move_back_to_perimeter_flag:
+                if len(self.manual_move) == 0:
+                    self.manual_move.append((0, 0, self.height, 0))
+                else:
+                    last_index = len(self.manual_move) - 1
+                    last_move = self.manual_move.pop(last_index)
+                    if last_move[2] != 0:
+                        new_distance = last_move[2] + self.height
+                        self.manual_move.append((0, 0, new_distance, 0))
+                    else:
+                        self.manual_move.append(last_move)
+                        self.manual_move.append((0, 0, self.height, 0))
 
     def land(self):
-        """Initiates landing.
-
-        Returns:
-            str: Response from Tello, 'OK' or 'FALSE'.
-
-        """
-
-        return self.send_command('land')
-
-    def move(self, direction, distance):
-        """Moves in a direction for a distance.
-
-        This method expects meters or feet. The Tello API expects distances
-        from 20 to 500 centimeters.
-
-        Metric: .02 to 5 meters
-        Imperial: .7 to 16.4 feet
-
-        Args:
-            direction (str): Direction to move, 'forward', 'back', 'right' or 'left'.
-            distance (int|float): Distance to move.
-
-        Returns:
-            str: Response from Tello, 'OK' or 'FALSE'.
-
-        """
-
-        distance = float(distance)
-
-        if self.imperial is True:
-            distance = int(round(distance * 30.48))
+        if self.height == 0:
+            print("Drone already landed!")
+        elif not self.manual:
+            print("Please activate manual mode to control the drone")
         else:
-            distance = int(round(distance * 100))
+            self.send('land', 3)
+            if not self.move_back_to_perimeter_flag:
+                if len(self.manual_move) == 0:
+                    self.manual_move.append((0, 0, -self.height, 0))
+                else:
+                    last_index = len(self.manual_move) - 1
+                    last_move = self.manual_move.pop(last_index)
+                    if last_move[2] != 0:
+                        new_distance = last_move[2] - self.height
+                        self.manual_move.append((0, 0, new_distance, 0))
+                    else:
+                        self.manual_move.append(last_move)
+                        self.manual_move.append((0, 0, -self.height, 0))
+            self.height = 0
 
-        return self.send_command('%s %s' % (direction, distance))
+    def rotate_cw(self, degree):
+        if self.height == 0:
+            print("Please take off drone to rotate the drone!")
+        elif not self.manual:
+            print("Please activate manual mode to control the drone")
+        else:
+            self.send('cw %s' % degree, 1)
+            if not self.move_back_to_perimeter_flag:
+                if len(self.manual_move) == 0:
+                    self.manual_move.append((0, 0, 0, degree))
+                else:
+                    last_index = len(self.manual_move) - 1
+                    last_move = self.manual_move.pop(last_index)
+                    if last_move[3] != 0:
+                        new_degree = last_move[3] + degree
+                        if new_degree > 360:
+                            new_degree -= 360
+                        self.manual_move.append((0, 0, 0, new_degree))
+                    else:
+                        self.manual_move.append(last_move)
+                        self.manual_move.append((0, 0, 0, degree))
 
-    def move_backward(self, distance):
-        """Moves backward for a distance.
-
-        See comments for Tello.move().
-
-        Args:
-            distance (int): Distance to move.
-
-        Returns:
-            str: Response from Tello, 'OK' or 'FALSE'.
-
-        """
-
-        return self.move('back', distance)
-
-    def move_down(self, distance):
-        """Moves down for a distance.
-
-        See comments for Tello.move().
-
-        Args:
-            distance (int): Distance to move.
-
-        Returns:
-            str: Response from Tello, 'OK' or 'FALSE'.
-
-        """
-
-        return self.move('down', distance)
-
-    def move_forward(self, distance):
-        """Moves forward for a distance.
-
-        See comments for Tello.move().
-
-        Args:
-            distance (int): Distance to move.
-
-        Returns:
-            str: Response from Tello, 'OK' or 'FALSE'.
-
-        """
-        return self.move('forward', distance)
-
-    def move_left(self, distance):
-        """Moves left for a distance.
-
-        See comments for Tello.move().
-
-        Args:
-            distance (int): Distance to move.
-
-        Returns:
-            str: Response from Tello, 'OK' or 'FALSE'.
-
-        """
-        return self.move('left', distance)
-
-    def move_right(self, distance):
-        """Moves right for a distance.
-
-        See comments for Tello.move().
-
-        Args:
-            distance (int): Distance to move.
-
-        """
-        return self.move('right', distance)
+    def rotate_ccw(self, degree):
+        if self.height == 0:
+            print("Please take off drone to rotate the drone!")
+        elif not self.manual:
+            print("Please activate manual mode to control the drone")
+        else:
+            self.send('ccw %s' % degree, 1)
+            if not self.move_back_to_perimeter_flag:
+                if len(self.manual_move) == 0:
+                    self.manual_move.append((0, 0, 0, -degree))
+                else:
+                    last_index = len(self.manual_move) - 1
+                    last_move = self.manual_move.pop(last_index)
+                    if last_move[3] != 0:
+                        new_degree = last_move[3] - degree
+                        if new_degree < -360:
+                            new_degree += 360
+                        self.manual_move.append((0, 0, 0, new_degree))
+                    else:
+                        self.manual_move.append(last_move)
+                        self.manual_move.append((0, 0, 0, -degree))
 
     def move_up(self, distance):
-        """Moves up for a distance.
+        if not self.manual:
+            print("Please activate manual mode to control the drone")
+        else:
+            self.height += distance
+            self.send('up %s' % distance, 1)
+            if not self.move_back_to_perimeter_flag:
+                if len(self.manual_move) == 0:
+                    self.manual_move.append((0, 0, distance, 0))
+                else:
+                    last_index = len(self.manual_move) - 1
+                    last_move = self.manual_move.pop(last_index)
+                    if last_move[2] != 0:
+                        new_distance = last_move[2] + self.distance
+                        self.manual_move.append((0, 0, new_distance, 0))
+                    else:
+                        self.manual_move.append(last_move)
+                        self.manual_move.append((0, 0, distance, 0))
 
-        See comments for Tello.move().
+    def move_down(self, distance):
+        if self.height == 0:
+            print("Drone already landed and cannot go lower!")
+        elif not self.manual:
+            print("Please activate manual mode to control the drone")
+        else:
+            if self.height - distance < 0:
+                self.send('down %s' % self.height, 1)
+                if not self.move_back_to_perimeter_flag:
+                    if len(self.manual_move) == 0:
+                        self.manual_move.append((0, 0, -self.height, 0))
+                    else:
+                        last_index = len(self.manual_move) - 1
+                        last_move = self.manual_move.pop(last_index)
+                        if last_move[2] != 0:
+                            new_distance = last_move[2] - distance
+                            self.manual_move.append((0, 0, new_distance, 0))
+                        else:
+                            self.manual_move.append(last_move)
+                            self.manual_move.append((0, 0, -self.height, 0))
+                self.height = 0
+            else:
+                self.send('down %s' % distance, 1)
+                if not self.move_back_to_perimeter_flag:
+                    if len(self.manual_move) == 0:
+                        self.manual_move.append((0, 0, -distance, 0))
+                    else:
+                        last_index = len(self.manual_move) - 1
+                        last_move = self.manual_move.pop(last_index)
+                        if last_move[2] != 0:
+                            new_distance = last_move[2] - distance
+                            self.manual_move.append((0, 0, new_distance, 0))
+                        else:
+                            self.manual_move.append(last_move)
+                            self.manual_move.append((0, 0, -distance, 0))
 
-        Args:
-            distance (int): Distance to move.
+    def move_backward(self, distance):
+        if self.height == 0:
+            print("Please take off drone to move the drone!")
+        elif not self.manual:
+            print("Please activate manual mode to control the drone")
+        else:
+            self.send('back %s' % distance, 1)
+            if not self.move_back_to_perimeter_flag:
+                if len(self.manual_move) == 0:
+                    self.manual_move.append((0, -distance, 0, 0))
+                else:
+                    last_index = len(self.manual_move) - 1
+                    last_move = self.manual_move.pop(last_index)
+                    if last_move[1] != 0:
+                        new_distance = last_move[1] - distance
+                        self.manual_move.append((0, new_distance, 0, 0))
+                    else:
+                        self.manual_move.append(last_move)
+                        self.manual_move.append((0, -distance, 0, 0))
 
-        Returns:
-            str: Response from Tello, 'OK' or 'FALSE'.
+    def move_forward(self, distance):
+        if self.height == 0:
+            print("Please take off drone to move the drone!")
+        elif not self.manual:
+            print("Please activate manual mode to control the drone")
+        else:
+            self.send('forward %s' % distance, 1)
+            if not self.move_back_to_perimeter_flag:
+                if len(self.manual_move) == 0:
+                    self.manual_move.append((0, distance, 0, 0))
+                else:
+                    last_index = len(self.manual_move) - 1
+                    last_move = self.manual_move.pop(last_index)
+                    if last_move[1] != 0:
+                        new_distance = last_move[1] + distance
+                        self.manual_move.append((0, new_distance, 0, 0))
+                    else:
+                        self.manual_move.append(last_move)
+                        self.manual_move.append((0, distance, 0, 0))
 
-        """
+    def move_left(self, distance):
+        if self.height == 0:
+            print("Please take off drone to move the drone!")
+        elif not self.manual:
+            print("Please activate manual mode to control the drone")
+        else:
+            self.send('left %s' % distance, 1)
+            if not self.move_back_to_perimeter_flag:
+                if len(self.manual_move) == 0:
+                    self.manual_move.append((-distance, 0, 0, 0))
+                else:
+                    last_index = len(self.manual_move) - 1
+                    last_move = self.manual_move.pop(last_index)
+                    if last_move[0] != 0:
+                        new_distance = last_move[0] - distance
+                        self.manual_move.append((new_distance, 0, 0, 0))
+                    else:
+                        self.manual_move.append(last_move)
+                        self.manual_move.append((-distance, 0, 0, 0))
 
-        return self.move('up', distance)
+    def move_right(self, distance):
+        if self.height == 0:
+            print("Please take off drone to move the drone!")
+        elif not self.manual:
+            print("Please activate manual mode to control the drone")
+        else:
+            self.send('right %s' % distance, 1)
+            if not self.move_back_to_perimeter_flag:
+                if len(self.manual_move) == 0:
+                    self.manual_move.append((distance, 0, 0, 0))
+                else:
+                    last_index = len(self.manual_move) - 1
+                    last_move = self.manual_move.pop(last_index)
+                    if last_move[0] != 0:
+                        new_distance = last_move[0] + distance
+                        self.manual_move.append((new_distance, 0, 0, 0))
+                    else:
+                        self.manual_move.append(last_move)
+                        self.manual_move.append((distance, 0, 0, 0))
+
+    def stop(self):
+        self.manual = True
+        self.send('stop', 2)
+
+    def set_degree(self, degree):
+        self.degree = degree
+
+    def set_distance(self, distance):
+        self.distance = distance
+
+    def back_to_perimeter_sweep(self):
+        while len(self.manual_move) and self.move_back_to_perimeter_flag:
+            last_index = len(self.manual_move) - 1
+            to_move = self.manual_move.pop(last_index)
+            if to_move[0] < 0:
+                self.move_right(-to_move[0])
+            elif to_move[0] > 0:
+                self.move_left(to_move[0])
+            elif to_move[1] < 0:
+                self.move_forward(-to_move[1])
+            elif to_move[1] > 0:
+                self.move_backward(to_move[1])
+            elif to_move[2] < 0:
+                self.move_up(to_move[2])
+            elif to_move[2] > 0:
+                self.move_down(to_move[2])
+            elif to_move[3] < -180 or to_move[3] > 180:
+                self.rotate_cw(to_move[3])
+            elif to_move[3] != 0 and (to_move[3] >= -180 or to_move[3] <= 180):
+                self.rotate_ccw(to_move[3])
+        self.manual = False
