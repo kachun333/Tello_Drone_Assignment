@@ -230,19 +230,7 @@ class Tello:
         else:
             self.send('cw %s' % degree, 1)
             if not self.move_back_to_perimeter_flag:
-                if len(self.manual_move) == 0:
-                    self.manual_move.append((0, 0, 0, degree))
-                else:
-                    last_index = len(self.manual_move) - 1
-                    last_move = self.manual_move.pop(last_index)
-                    if last_move[3] != 0:
-                        new_degree = last_move[3] + degree
-                        if new_degree > 360:
-                            new_degree -= 360
-                        self.manual_move.append((0, 0, 0, new_degree))
-                    else:
-                        self.manual_move.append(last_move)
-                        self.manual_move.append((0, 0, 0, degree))
+                self.append_manual_move(3, degree)
 
     def rotate_ccw(self, degree):
         if self.height == 0:
@@ -252,19 +240,7 @@ class Tello:
         else:
             self.send('ccw %s' % degree, 1)
             if not self.move_back_to_perimeter_flag:
-                if len(self.manual_move) == 0:
-                    self.manual_move.append((0, 0, 0, -degree))
-                else:
-                    last_index = len(self.manual_move) - 1
-                    last_move = self.manual_move.pop(last_index)
-                    if last_move[3] != 0:
-                        new_degree = last_move[3] - degree
-                        if new_degree < -360:
-                            new_degree += 360
-                        self.manual_move.append((0, 0, 0, new_degree))
-                    else:
-                        self.manual_move.append(last_move)
-                        self.manual_move.append((0, 0, 0, -degree))
+                self.append_manual_move(3, -degree)
 
     def move_up(self, distance):
         if not self.manual:
@@ -273,17 +249,7 @@ class Tello:
             self.height += distance
             self.send('up %s' % distance, 1)
             if not self.move_back_to_perimeter_flag:
-                if len(self.manual_move) == 0:
-                    self.manual_move.append((0, 0, distance, 0))
-                else:
-                    last_index = len(self.manual_move) - 1
-                    last_move = self.manual_move.pop(last_index)
-                    if last_move[2] != 0:
-                        new_distance = last_move[2] + self.distance
-                        self.manual_move.append((0, 0, new_distance, 0))
-                    else:
-                        self.manual_move.append(last_move)
-                        self.manual_move.append((0, 0, distance, 0))
+                self.append_manual_move(2, distance)
 
     def move_down(self, distance):
         if self.height == 0:
@@ -294,32 +260,12 @@ class Tello:
             if self.height - distance < 0:
                 self.send('down %s' % self.height, 1)
                 if not self.move_back_to_perimeter_flag:
-                    if len(self.manual_move) == 0:
-                        self.manual_move.append((0, 0, -self.height, 0))
-                    else:
-                        last_index = len(self.manual_move) - 1
-                        last_move = self.manual_move.pop(last_index)
-                        if last_move[2] != 0:
-                            new_distance = last_move[2] - distance
-                            self.manual_move.append((0, 0, new_distance, 0))
-                        else:
-                            self.manual_move.append(last_move)
-                            self.manual_move.append((0, 0, -self.height, 0))
+                    self.append_manual_move(2, -self.height)
                 self.height = 0
             else:
                 self.send('down %s' % distance, 1)
                 if not self.move_back_to_perimeter_flag:
-                    if len(self.manual_move) == 0:
-                        self.manual_move.append((0, 0, -distance, 0))
-                    else:
-                        last_index = len(self.manual_move) - 1
-                        last_move = self.manual_move.pop(last_index)
-                        if last_move[2] != 0:
-                            new_distance = last_move[2] - distance
-                            self.manual_move.append((0, 0, new_distance, 0))
-                        else:
-                            self.manual_move.append(last_move)
-                            self.manual_move.append((0, 0, -distance, 0))
+                    self.append_manual_move(2, -distance)
 
     def move_backward(self, distance):
         if self.height == 0:
@@ -329,17 +275,7 @@ class Tello:
         else:
             self.send('back %s' % distance, 1)
             if not self.move_back_to_perimeter_flag:
-                if len(self.manual_move) == 0:
-                    self.manual_move.append((0, -distance, 0, 0))
-                else:
-                    last_index = len(self.manual_move) - 1
-                    last_move = self.manual_move.pop(last_index)
-                    if last_move[1] != 0:
-                        new_distance = last_move[1] - distance
-                        self.manual_move.append((0, new_distance, 0, 0))
-                    else:
-                        self.manual_move.append(last_move)
-                        self.manual_move.append((0, -distance, 0, 0))
+                self.append_manual_move(1, -distance)
 
     def move_forward(self, distance):
         if self.height == 0:
@@ -349,17 +285,7 @@ class Tello:
         else:
             self.send('forward %s' % distance, 1)
             if not self.move_back_to_perimeter_flag:
-                if len(self.manual_move) == 0:
-                    self.manual_move.append((0, distance, 0, 0))
-                else:
-                    last_index = len(self.manual_move) - 1
-                    last_move = self.manual_move.pop(last_index)
-                    if last_move[1] != 0:
-                        new_distance = last_move[1] + distance
-                        self.manual_move.append((0, new_distance, 0, 0))
-                    else:
-                        self.manual_move.append(last_move)
-                        self.manual_move.append((0, distance, 0, 0))
+                self.append_manual_move(1, distance)
 
     def move_left(self, distance):
         if self.height == 0:
@@ -369,17 +295,7 @@ class Tello:
         else:
             self.send('left %s' % distance, 1)
             if not self.move_back_to_perimeter_flag:
-                if len(self.manual_move) == 0:
-                    self.manual_move.append((-distance, 0, 0, 0))
-                else:
-                    last_index = len(self.manual_move) - 1
-                    last_move = self.manual_move.pop(last_index)
-                    if last_move[0] != 0:
-                        new_distance = last_move[0] - distance
-                        self.manual_move.append((new_distance, 0, 0, 0))
-                    else:
-                        self.manual_move.append(last_move)
-                        self.manual_move.append((-distance, 0, 0, 0))
+                self.append_manual_move(0, -distance)
 
     def move_right(self, distance):
         if self.height == 0:
@@ -389,17 +305,22 @@ class Tello:
         else:
             self.send('right %s' % distance, 1)
             if not self.move_back_to_perimeter_flag:
-                if len(self.manual_move) == 0:
-                    self.manual_move.append((distance, 0, 0, 0))
-                else:
-                    last_index = len(self.manual_move) - 1
-                    last_move = self.manual_move.pop(last_index)
-                    if last_move[0] != 0:
-                        new_distance = last_move[0] + distance
-                        self.manual_move.append((new_distance, 0, 0, 0))
-                    else:
-                        self.manual_move.append(last_move)
-                        self.manual_move.append((distance, 0, 0, 0))
+                self.append_manual_move(0, distance)
+
+    def append_manual_move(self, index, value):
+        new_move = [0, 0, 0, 0]
+        new_move[index] = value
+        if len(self.manual_move) == 0:
+            self.manual_move.append(new_move)
+        else:
+            last_index = len(self.manual_move) - 1
+            last_move = self.manual_move.pop(last_index)
+            if last_move[index] != 0:
+                new_move[index] = new_move[index] + last_move[index]
+                self.manual_move.append(new_move)
+            else:
+                self.manual_move.append(last_move)
+                self.manual_move.append(new_move)
 
     def stop(self):
         self.manual = True
@@ -412,6 +333,7 @@ class Tello:
         self.distance = distance
 
     def back_to_perimeter_sweep(self):
+        print("\nMoving drone back to original position")
         while len(self.manual_move) and self.move_back_to_perimeter_flag:
             last_index = len(self.manual_move) - 1
             to_move = self.manual_move.pop(last_index)
@@ -432,3 +354,5 @@ class Tello:
             elif to_move[3] != 0 and (to_move[3] >= -180 or to_move[3] <= 180):
                 self.rotate_ccw(to_move[3])
         self.manual = False
+        if len(self.manual_move) == 0:
+            print("Drone back to original position\n")

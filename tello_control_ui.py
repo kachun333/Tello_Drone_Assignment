@@ -73,7 +73,7 @@ class TelloUI:
         self.thread.start()
 
         # the sending_command will send command to tello every 5 seconds
-        self.sending_command_thread = threading.Thread(target=self._sendingCommand)
+        #self.sending_command_thread = threading.Thread(target=self._sendingCommand)
 
         # set a callback to handle when the window is closed
         self.root.wm_title("TELLO Controller")
@@ -87,7 +87,7 @@ class TelloUI:
         """
         self.tello.manual = False
         time.sleep(3)
-        self.sending_command_thread.start()
+        # self.sending_command_thread.start()
         self.auto_route_thread.start()
         try:
             # start the thread that get GUI image and drwa skeleton 
