@@ -52,7 +52,7 @@ class TelloUI:
         self.btn_snapshot.pack(side="bottom", fill="both",
                                expand="yes", padx=10, pady=5)
 
-        self.btn_pause = tki.Button(self.root, text="Pause", relief="raised", command=self.pauseVideo)
+        self.btn_pause = tki.Button(self.root, text="Pause Video", relief="raised", command=self.pauseVideo)
         self.btn_pause.pack(side="bottom", fill="both",
                             expand="yes", padx=10, pady=5)
 
@@ -62,7 +62,7 @@ class TelloUI:
                               expand="yes", padx=10, pady=5)
 
         self.btn_restart = tki.Button(
-            self.root, text="Restart", relief="raised", command=self.restart)
+            self.root, text="Restart Preplanned Route", relief="raised", command=self.restart)
         self.btn_restart.pack(side="bottom", fill="both",
                               expand="yes", padx=10, pady=5)
         

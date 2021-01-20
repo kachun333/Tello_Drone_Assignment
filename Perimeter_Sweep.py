@@ -17,6 +17,8 @@ class AutoRoute:
 
     def restart(self):
         if self.counter >= 16:
+            print("\nRestarting the drone sweeping process")
+            time.sleep(1)
             self.counter = 0
         else:
             print("Previous perimeter sweep is not done yet!")
@@ -92,3 +94,4 @@ class AutoRoute:
             # Land
             self.tello.send("land", 3)
             self.counter += 1
+            print("The drone has landed.")
