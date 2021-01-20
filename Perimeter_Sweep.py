@@ -86,6 +86,7 @@ class AutoRoute:
             # Turn to original direction before land
             print("Turn to original direction before land.\n")
             self.tello.send("cw 180", 4)
+            self.counter += 1
 
         elif self.counter == 16:
             # Land
